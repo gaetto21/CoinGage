@@ -1,0 +1,308 @@
+{% extends 'myapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="data-preprocessing-container">
+    <h1 class="text-3xl font-bold mb-6">데이터 전처리</h1>
+    
+    <form method="post" class="preprocessing-form">
+        {% csrf_token %}
+        
+        <!-- 데이터 소스 정보 -->
+        <div class="form-group">
+            <h2 class="text-xl font-semibold mb-4">데이터 소스</h2>
+            <div class="form-row bg-white p-4 rounded-lg shadow-sm">
+                <div class="flex items-center gap-6">
+                    <span class="text-gray-600">입력 경로: ./myproject/data/feature_data</span>
+                    <span class="text-gray-300">|</span>
+                    <span class="text-gray-600">출력 경로: ./myproject/data/processed_data</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 스케일링 설정 -->
+        <div class="form-group">
+            <h3 class="section-title">
+                <span class="section-number">1</span>
+                스케일링 방법
+            </h3>
+            <div class="indicator-item">
+                <div class="mb-4">
+                    <select name="scaler_type" class="form-select">
+                        <option value="minmax">MinMaxScaler</option>
+                        <option value="standard">StandardScaler</option>
+                        <option value="robust">RobustScaler</option>
+                    </select>
+                </div>
+            </div>
+            
+            <h3 class="section-title">
+                <span class="section-number">2</span>
+                데이터 분할 비율
+            </h3>
+            <div class="indicator-item">
+                <div class="grid grid-cols-3 gap-8">
+                    <div class="space-y-2">
+                        <label class="block text-gray-700 font-medium">Train (%)</label>
+                        <input type="number" name="train_ratio" value="70" min="0" max="100" class="form-input">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-gray-700 font-medium">Validation (%)</label>
+                        <input type="number" name="val_ratio" value="15" min="0" max="100" class="form-input">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-gray-700 font-medium">Test (%)</label>
+                        <input type="number" name="test_ratio" value="15" min="0" max="100" class="form-input">
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="section-title">
+                <span class="section-number">3</span>
+                LSTM 시퀀스 길이
+            </h3>
+            <div class="indicator-item">
+                <input type="number" name="sequence_length" value="60" min="1" class="form-input">
+            </div>
+        </div>
+
+        <!-- 처리 상태 -->
+        <div class="form-group">
+            <div id="processingStatus" class="status-container"></div>
+        </div>
+
+        <div class="button-container">
+            <button type="submit" class="process-btn">
+                데이터 전처리 시작
+            </button>
+        </div>
+    </form>
+
+    <!-- 데이터 미리보기 -->
+    <div class="preview-section" id="dataPreview">
+        {% if preview_data %}
+        <div class="results-header">
+            <h3 class="text-xl font-semibold">데이터 미리보기</h3>
+            <div class="text-sm text-gray-600">최근 3개 데이터</div>
+        </div>
+        <div class="data-table-container">
+            <table class="min-w-full">
+                <thead>
+                    <tr>
+                        {% for column in preview_data.columns %}
+                        <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview_data.values %}
+                    <tr>
+                        {% for value in row %}
+                        <td>{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .data-preprocessing-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .preprocessing-form {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+        margin-bottom: 30px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        margin-top: 30px;
+    }
+
+    .section-number {
+        background: #87CEEB;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-size: 0.9rem;
+    }
+
+    .indicator-item {
+        background: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .form-select, .form-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background-color: #f8fafc;
+    }
+
+    .status-container {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        color: #495057;
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+
+    .process-btn {
+        background: #87CEEB;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .process-btn:hover {
+        background: #5FB6E1;
+    }
+
+    .preview-section {
+        margin-top: 30px;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .data-table-container {
+        margin-top: 15px;
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th {
+        background: #2c3e50;
+        color: white;
+        padding: 12px;
+        text-align: left;
+        font-weight: 500;
+    }
+
+    td {
+        padding: 12px;
+        border-bottom: 1px solid #e9ecef;
+        color: #495057;
+    }
+
+    tr:hover {
+        background: #f8f9fa;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const statusDiv = document.getElementById('processingStatus');
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        statusDiv.textContent = '데이터 전처리 중...';
+        
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        fetch('/model/data-preprocessing/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                statusDiv.textContent = `처리 완료: ${data.processed_files}개 파일 처리됨`;
+                if (data.preview_data) {
+                    updatePreviewTable(data.preview_data);
+                }
+            } else {
+                statusDiv.textContent = `오류 발생: ${data.message}`;
+            }
+        })
+        .catch(error => {
+            statusDiv.textContent = `오류 발생: ${error.message}`;
+            console.error('Error:', error);
+        });
+    });
+
+    function updatePreviewTable(data) {
+        const previewDiv = document.getElementById('dataPreview');
+        if (!data || data.length === 0) return;
+
+        const columns = Object.keys(data[0]);
+        const tableHTML = `
+            <div class="results-header">
+                <h3 class="text-xl font-semibold">데이터 미리보기</h3>
+                <div class="text-sm text-gray-600">최근 3개 데이터</div>
+            </div>
+            <div class="data-table-container">
+                <table class="min-w-full">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr>
+                                ${columns.map(col => `<td>${row[col]}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        previewDiv.innerHTML = tableHTML;
+    }
+});
+</script>
+{% endblock %} 

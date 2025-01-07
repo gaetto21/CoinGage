@@ -1,0 +1,362 @@
+{% extends 'myapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="data-preprocessing-container">
+    <h1 class="text-3xl font-bold mb-6">모델 개발</h1>
+    
+    <div class="preprocessing-form">
+        <div class="form-group">
+            <h2 class="section-title">
+                <span class="section-number">1</span>
+                모델 설정
+            </h2>
+            <div class="indicator-item">
+                <form id="modelForm">
+                    {% csrf_token %}
+                    <!-- 윈도우 크기와 특성 수를 가로로 배치 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="w-[48%]">
+                            <label for="windowSize" class="block text-gray-700 font-medium mb-2">윈도우 크기</label>
+                            <input type="text" class="form-input" id="windowSize" name="window_size" readonly>
+                        </div>
+                        <div class="w-[48%]">
+                            <label for="featureCount" class="block text-gray-700 font-medium mb-2">특성 수</label>
+                            <input type="text" class="form-input" id="featureCount" name="feature_count" readonly>
+                        </div>
+                    </div>
+                    
+                    <!-- 패턴 선택 -->
+                    <div class="mb-6">
+                        <label class="block text-gray-700 font-medium mb-2">패턴 선택</label>
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            {% for pattern in available_patterns %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="patterns[]" 
+                                       value="{{ pattern.value }}" id="{{ pattern.value }}" checked>
+                                <label class="form-check-label ml-2" for="{{ pattern.value }}">
+                                    {{ pattern.label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- 손절매와 익절 비율을 가로로 배치 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="w-[48%]">
+                            <label for="stopLoss" class="block text-gray-700 font-medium mb-2">손절 비율 (%)</label>
+                            <input type="number" class="form-input" id="stopLoss" name="stop_loss" 
+                                   value="2" step="0.1" min="0.1" max="10">
+                        </div>
+                        <div class="w-[48%]">
+                            <label for="takeProfit" class="block text-gray-700 font-medium mb-2">익절 비율 (%)</label>
+                            <input type="number" class="form-input" id="takeProfit" name="take_profit" 
+                                   value="4" step="0.1" min="0.1" max="20">
+                        </div>
+                    </div>
+                    
+                    <div class="button-container">
+                        <button type="submit" class="process-btn" id="createModelBtn">모델설계</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 모델 학습 섹션 -->
+        <div class="form-group" id="trainingSection" style="display: none;">
+            <h2 class="section-title">
+                <span class="section-number">2</span>
+                모델 학습
+            </h2>
+            <div class="indicator-item">
+                <form id="trainingForm">
+                    {% csrf_token %}
+                    <div class="mb-6">
+                        <label for="dataPath" class="block text-gray-700 font-medium mb-2">학습 데이터 경로</label>
+                        <input type="text" class="form-input mb-2" id="dataPath" name="data_path" 
+                               value="data/learning_data" readonly>
+                        <small class="block text-gray-600 text-sm">
+                            학습 데이터는 프로젝트 루트의 data/learning_data 디렉토리에서 자동으로 로드됩니다.<br>
+                            필요한 파일:<br>
+                            - combined_X_train.npy: 학습 입력 데이터<br>
+                            - combined_y_train.npy: 학습 출력 데이터<br>
+                            - feature.pkl: 특성 정보<br>
+                            - scaler.pkl: 스케일러 객체
+                        </small>
+                        <div id="dataCheckResult" class="mt-2" style="display: none;">
+                        </div>
+                    </div>
+                    
+                    <div class="button-container">
+                        <button type="submit" class="process-btn" id="trainModelBtn">모델 학습</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 결과 표시 영역 -->
+    <div class="mt-4" id="resultArea" style="display: none;">
+        <div class="alert" role="alert"></div>
+    </div>
+</div>
+
+<style>
+    .data-preprocessing-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .preprocessing-form {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+        margin-bottom: 30px;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        margin-top: 30px;
+    }
+
+    .section-number {
+        background: #87CEEB;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-size: 0.9rem;
+    }
+
+    .indicator-item {
+        background: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background-color: #f8fafc;
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+
+    .process-btn {
+        background: #87CEEB;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .process-btn:hover {
+        background: #5FB6E1;
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .form-check-input {
+        margin-right: 8px;
+    }
+
+    .form-check-label {
+        color: #495057;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // CSRF 토큰 설정
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+    
+    // 학습 데이터 shape 정보 로드
+    $.ajax({
+        url: '{% url "data_info" %}',
+        type: 'GET',
+        success: function(data) {
+            console.log('Data info response:', data);  // 응답 데이터 로깅
+            $('#windowSize').val(data.window_size);
+            $('#featureCount').val(data.feature_count);
+        },
+        error: function(xhr, status, error) {
+            console.error('데이터 정보 로드 실패:', error);
+            console.error('Error response:', xhr.responseText);  // 에러 응답 로깅
+            $('#windowSize').val('정보 없음');
+            $('#featureCount').val('정보 없음');
+        }
+    });
+    
+    // 모델 생성 폼 제출
+    $('#modelForm').on('submit', function(e) {
+        e.preventDefault();
+        console.log('Form submitted'); // 디버깅용 로그
+        
+        // 버튼 비활성화
+        $('#createModelBtn').prop('disabled', true).html(
+            '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 설계 중...'
+        );
+        
+        // 선택된 패턴들 수집
+        const patterns = [];
+        $('input[name="patterns[]"]:checked').each(function() {
+            patterns.push($(this).val());
+        });
+        
+        // 데이터 준비
+        const data = {
+            window_size: parseInt($('#windowSize').val()),
+            feature_count: parseInt($('#featureCount').val()),
+            patterns: patterns,
+            stop_loss: parseFloat($('#stopLoss').val()) / 100,
+            take_profit: parseFloat($('#takeProfit').val()) / 100
+        };
+        
+        console.log('Sending data:', data); // 디버깅용 로그
+        
+        // API 호출
+        $.ajax({
+            url: '{% url "create_model" %}',
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                console.log('Success:', response); // 디버깅용 로그
+                showResult('success', response.message);
+                $('#trainingSection').show();
+            },
+            error: function(xhr, status, error) {
+                console.log('Error:', xhr.responseText); // 디버깅용 로그
+                const response = xhr.responseJSON || {};
+                showResult('danger', response.message || '모델 생성 중 오류가 발생했습니다.');
+            },
+            complete: function() {
+                $('#createModelBtn').prop('disabled', false).text('모델설계');
+            }
+        });
+    });
+    
+    // 모델 학습 폼 제출
+    $('#trainingForm').on('submit', function(e) {
+        e.preventDefault();
+        console.log('Training form submitted'); // 디버깅용 로그
+        
+        // 버튼 비활성화
+        $('#trainModelBtn').prop('disabled', true).html(
+            '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 학습 중...'
+        );
+        
+        // 데이터 준비
+        const data = {
+            data_path: $('#dataPath').val()
+        };
+        
+        console.log('Sending training data:', data); // 디버깅용 로그
+        
+        // API 호출
+        $.ajax({
+            url: '{% url "train_model" %}',
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                console.log('Training success:', response); // 디버깅용 로그
+                showResult('success', response.message);
+            },
+            error: function(xhr, status, error) {
+                console.log('Training error:', xhr.responseText); // 디버깅용 로그
+                const response = xhr.responseJSON || {};
+                showResult('danger', response.message || '모델 학습 중 오류가 발생했습니다.');
+            },
+            complete: function() {
+                $('#trainModelBtn').prop('disabled', false).text('모델 학습');
+            }
+        });
+    });
+    
+    function showResult(type, message) {
+        const resultArea = $('#resultArea');
+        const alert = resultArea.find('.alert');
+        
+        alert.removeClass('alert-success alert-danger')
+             .addClass('alert-' + type)
+             .text(message);
+             
+        resultArea.show();
+        
+        // 5초 후 메시지 숨기기
+        setTimeout(function() {
+            resultArea.fadeOut();
+        }, 5000);
+    }
+});
+</script>
+{% endblock %} 

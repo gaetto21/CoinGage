@@ -1,0 +1,403 @@
+{% extends 'myapp/base.html' %}
+
+{% block title %}데이터 수집{% endblock %}
+
+{% block content %}
+<div class="data-collection-container">
+    <h1 class="text-3xl font-bold mb-6">데이터 수집</h1>
+    
+    <form class="collection-form" onsubmit="collectData(event)">
+        {% csrf_token %}
+        
+        <!-- 데이터 소스 정보 -->
+        <div class="form-group">
+            <h2 class="text-xl font-semibold mb-4">데이터 소스</h2>
+            <div class="form-row bg-white p-4 rounded-lg shadow-sm">
+                <div class="flex items-center gap-6">
+                    <span class="text-gray-600">저장 경로: ./myproject/data/raw_data</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <h3 class="section-title">
+                <span class="section-number">1</span>
+                시간 간격
+            </h3>
+            <div class="indicator-item">
+                <select id="interval" class="form-select">
+                    {% for value, label in intervals %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <h3 class="section-title">
+                <span class="section-number">2</span>
+                수집 기간
+            </h3>
+            <div class="indicator-item">
+                <input type="number" id="days" class="form-input" value="30" min="1">
+            </div>
+
+            <h3 class="section-title">
+                <span class="section-number">3</span>
+                종목 선택
+            </h3>
+            <div class="indicator-item">
+                <div class="ticker-grid">
+                    {% for ticker in tickers %}
+                    <div class="ticker-item">
+                        <input type="checkbox" id="ticker_{{ ticker }}" value="{{ ticker }}" class="form-checkbox">
+                        <label for="ticker_{{ ticker }}">{{ ticker }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="button-progress-container">
+                <button type="submit" class="collect-btn">데이터 수집</button>
+                <div class="progress-container">
+                    <div id="progressBar" class="progress-bar"></div>
+                    <span id="progressText">0%</span>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="preview-section">
+        <div class="results-header">
+            <h3 class="text-xl font-semibold">최근 수집 데이터</h3>
+            <div class="data-info" id="dataInfo">
+                <!-- 데이터 정보가 여기에 표시됩니다 -->
+            </div>
+        </div>
+        <div class="data-table-container">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Datetime</th>
+                        <th>Open</th>
+                        <th>High</th>
+                        <th>Low</th>
+                        <th>Close</th>
+                        <th>Volume</th>
+                        <th>Quote Volume</th>
+                        <th>Trade Count</th>
+                        <th>Taker Buy Volume</th>
+                        <th>Taker Buy Quote Volume</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .data-collection-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .collection-form {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+        margin-bottom: 30px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        margin-top: 30px;
+    }
+
+    .section-number {
+        background: #87CEEB;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-size: 0.9rem;
+    }
+
+    .indicator-item {
+        background: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .form-select, .form-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background-color: #f8fafc;
+    }
+
+    .ticker-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .ticker-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px;
+    }
+
+    .form-checkbox {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        border: 2px solid #87CEEB;
+    }
+
+    .button-progress-container {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .collect-btn {
+        background: #87CEEB;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .collect-btn:hover {
+        background: #5FB6E1;
+    }
+
+    .progress-container {
+        flex: 1;
+        max-width: 300px;
+        height: 20px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .progress-bar {
+        width: 0;
+        height: 100%;
+        background-color: #87CEEB;
+        transition: width 0.3s ease;
+    }
+
+    #progressText {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: #333;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .preview-section {
+        margin-top: 30px;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .results-header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .data-info {
+        font-size: 14px;
+        color: #666;
+        background-color: #f8f9fa;
+        padding: 5px 10px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+    }
+
+    .data-table-container {
+        margin-top: 15px;
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th {
+        background: #2c3e50;
+        color: white;
+        padding: 12px;
+        text-align: left;
+        font-weight: 500;
+        position: sticky;
+        top: 0;
+    }
+
+    td {
+        padding: 12px;
+        border-bottom: 1px solid #e9ecef;
+        color: #495057;
+    }
+
+    tr:hover {
+        background: #f8f9fa;
+    }
+</style>
+
+<script>
+    let totalTickers = 0;
+    let processedTickers = 0;
+
+    async function collectData(e) {
+        if (e) e.preventDefault();
+        
+        const interval = document.getElementById('interval').value;
+        const days = document.getElementById('days').value;
+        const selectedTickers = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+
+        if (selectedTickers.length === 0) {
+            alert('최소 하나 이상의 종목을 선택해주세요.');
+            return;
+        }
+
+        // 진행률 초기화
+        totalTickers = selectedTickers.length;
+        processedTickers = 0;
+        updateProgress(0);
+        
+        // 상태 표시 업데이트
+        const statusDiv = document.getElementById('dataInfo');
+        const progressBar = document.getElementById('progressBar');
+        statusDiv.innerHTML = '데이터 수집 중...';
+        progressBar.style.backgroundColor = '#FF69B4';  // 진행바 색상을 분홍색으로 변경
+
+        try {
+            const response = await fetch('/model/data-collection/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    tickers: selectedTickers,
+                    interval: interval,
+                    days: days
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                // 데이터 테이블 업데이트
+                updateDataTable(result.data);
+                
+                // 데이터 정보 업데이트
+                const tickerInfo = Object.entries(result.data_info)
+                    .map(([ticker, count]) => `${ticker}: ${count}행`)
+                    .join(', ');
+                const dataInfo = `수집된 종목별 데이터 수: ${tickerInfo} | 총 데이터 수: ${result.total_rows}행 | 간격: ${interval} | 기간: ${days}일`;
+                statusDiv.innerHTML = dataInfo;
+                
+                // 진행률 100%로 설정
+                updateProgress(100);
+            } else {
+                statusDiv.innerHTML = `오류 발생: ${result.message}`;
+                updateProgress(0);
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `오류 발생: ${error.message}`;
+            updateProgress(0);
+        }
+    }
+
+    function updateProgress(percent) {
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = `${Math.round(percent)}%`;
+    }
+
+    function updateDataTable(data) {
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+
+        // 최근 3개 데이터만 표시
+        const recentData = data.slice(-3);
+        
+        recentData.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${row.datetime}</td>
+                <td>${Number(row.open).toFixed(4)}</td>
+                <td>${Number(row.high).toFixed(4)}</td>
+                <td>${Number(row.low).toFixed(4)}</td>
+                <td>${Number(row.close).toFixed(4)}</td>
+                <td>${Number(row.volume).toFixed(4)}</td>
+                <td>${Number(row.quote_volume).toFixed(4)}</td>
+                <td>${Number(row.trade_count).toFixed(0)}</td>
+                <td>${Number(row.taker_buy_volume).toFixed(4)}</td>
+                <td>${Number(row.taker_buy_quote_volume).toFixed(4)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %} 
